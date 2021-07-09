@@ -7,6 +7,9 @@
 #include "Memory/Heap.h"
 
 KernelInfo kernelInfo;
+IDTR idtr;
+BasicRenderer r = BasicRenderer(NULL, NULL);
+
 void PrepareMemory(BootInfo* bootInfo){
     GlobalAllocator = PageFrameAllocator();
     GlobalAllocator.ReadEFIMemoryMap(bootInfo->memMap, bootInfo->memMapSize, bootInfo->memDescriptorSize);
@@ -39,8 +42,6 @@ void PrepareMemory(BootInfo* bootInfo){
     kernelInfo.pageTableManager = &GlobalPageTableManager;
 }
 
-IDTR idtr;
-
 void SetIDTGate(void* handler, uint8_t entryOffset, uint8_t type_attr, uint8_t selector){
     IDTDescriptorEntry* interrupt = (IDTDescriptorEntry*)(idtr.Offset + entryOffset * sizeof(IDTDescriptorEntry));
     interrupt->SetOffset((uint64_t)handler);
@@ -48,6 +49,9 @@ void SetIDTGate(void* handler, uint8_t entryOffset, uint8_t type_attr, uint8_t s
     interrupt->Selector = selector;
 }
 
+/*
+ Prepares the OS to handle intrrupts.
+ */
 void PrepareInterrupts(){
     idtr.Limit = 0x0FFF;
     idtr.Offset = (uint64_t)GlobalAllocator.RequestPage();
@@ -58,12 +62,18 @@ void PrepareInterrupts(){
     SetIDTGate((void*)KBIntHandler, 0x21, IDT_TA_InterruptGate, 0x08);
     SetIDTGate((void*)MouseIntHandler, 0x2c, IDT_TA_InterruptGate, 0x08);
     SetIDTGate((void*)PITIntHandler, 0x20, IDT_TA_InterruptGate, 0x08);
+    SetIDTGate((void*)DivideByZeroFaultHandler, 0x0, IDT_TA_InterruptGate, 0x08);
 
+    // Load the interrupt descriptor table
     asm ("lidt %0" : : "m" (idtr));
 
     RemapPIC();
 }
 
+/*
+ Loads the Advanced Configuration and Power Interface and prepares it for use.
+ ACPI is used for interfacing with PCI devices.
+ */
 void PrepareACPI(BootInfo* bootInfo){
     ACPI::SDTHeader* xsdt = (ACPI::SDTHeader*)(bootInfo->rsdp->XSDTAddress);
 
@@ -71,14 +81,9 @@ void PrepareACPI(BootInfo* bootInfo){
     PCI::EnumeratePCI(mcfg);
 }
 
-BasicRenderer r = BasicRenderer(NULL, NULL);
 KernelInfo InitializeKernel(BootInfo* bootInfo){
     r = BasicRenderer(bootInfo->frameBuffer, bootInfo->psf1_Font);
     GlobalRenderer = &r;
-
-    GlobalRenderer->CursorPosition = {0, 0};
-    GlobalRenderer->Print("Kernel starting");
-    GlobalRenderer->CursorPosition = {0, GlobalRenderer->CursorPosition.Y + 16};
 
     GDTDescriptor gdtDescriptor;
     gdtDescriptor.Size = sizeof(GDT) - 1;
@@ -86,13 +91,17 @@ KernelInfo InitializeKernel(BootInfo* bootInfo){
     LoadGDT(&gdtDescriptor);
 
     PrepareMemory(bootInfo);
-    
-    memset(bootInfo->frameBuffer->BaseAddress, 0, bootInfo->frameBuffer->BufferSize);
-    
+
     InitializeHeap((void*)0x0000100000000000, 0x10);
+
+    GlobalRenderer->Clear();
+    GlobalRenderer->CursorPosition = {0, 0};
+    GlobalRenderer->Print("Kernel starting");
+    GlobalRenderer->Next();
 
     PrepareInterrupts();
 
+    // Intialize basic mouse functionality
     InitPS2Mouse();
 
     PrepareACPI(bootInfo);
@@ -100,6 +109,7 @@ KernelInfo InitializeKernel(BootInfo* bootInfo){
     outb(PIC1_DATA, 0b11111000);
     outb(PIC2_DATA, 0b11101111);
 
+    // Enable interrupts
     asm ("sti");
 
     return kernelInfo;

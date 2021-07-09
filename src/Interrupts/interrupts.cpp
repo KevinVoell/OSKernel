@@ -6,19 +6,25 @@
 #include "../UserInput/Mouse.h"
 
 __attribute__((interrupt))void PageFaultHandler(interrupt_frame* frame){
-    Panic("Page Fault Detected");
+    Panic("Page Fault Detected", frame);
 
     while(true);
 }
 
 __attribute__((interrupt))void DoubleFaultHandler(interrupt_frame* frame){
-    Panic("Double Fault Detected");
+    Panic("Double Fault Detected", frame);
     while(true);
 }
 
 __attribute__((interrupt))void GPFaultHandler(interrupt_frame* frame){
-    Panic("General Protection Fault Detected");
+
+    Panic("General Protection Fault Detected", frame);
     while(true);
+}
+
+__attribute__((interrupt))void DivideByZeroFaultHandler(interrupt_frame* frame){
+    Panic("Divide by Zero Fault Detected", frame);
+    while(true);  
 }
 
 __attribute__((interrupt))void KBIntHandler(interrupt_frame* frame){

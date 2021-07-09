@@ -1,6 +1,6 @@
 #include "Mouse.h"
 #include "../IO.h"
-#include "../BasicRenderer.h"
+#include "../video/BasicRenderer.h"
 
 Point MousePosition;
 Point MousePositionOld;

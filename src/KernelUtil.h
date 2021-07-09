@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stddef.h>
-#include "BasicRenderer.h"
+#include "video/BasicRenderer.h"
 #include "cstr.h"
 #include "efiMemory.h"
 #include "memory.h"
@@ -11,7 +11,7 @@
 #include "Paging/Paging.h"
 #include "Paging/PageTableManager.h"
 #include "ACPI.h"
-#include "PCI.h"
+#include "pci/PCI.h"
 
 struct BootInfo {
 	FrameBuffer* frameBuffer;
